@@ -231,7 +231,7 @@ function parseItemText(text: string, id: number): PobItem | null {
         item.fractured.push(createItemMod(line));
       } else if (line.startsWith('{enchant}') || line.startsWith('{scourge}')) {
         item.enchant.push(createItemMod(line));
-      } else {
+      } else if (isValidModLine(line)) {
         item.implicits.push(createItemMod(line));
       }
       implicitCount--;
@@ -247,8 +247,8 @@ function parseItemText(text: string, id: number): PobItem | null {
         item.crafted.push(createItemMod(line));
       } else if (line.startsWith('{fractured}')) {
         item.fractured.push(createItemMod(line));
-      } else {
-        // In explicits section, add any line that looks like a mod
+      } else if (isValidModLine(line)) {
+        // Only add lines that actually look like mods
         item.explicits.push(createItemMod(line));
       }
       continue;
@@ -261,7 +261,7 @@ function parseItemText(text: string, id: number): PobItem | null {
         item.crafted.push(createItemMod(line));
       } else if (line.startsWith('{fractured}')) {
         item.fractured.push(createItemMod(line));
-      } else {
+      } else if (isValidModLine(line)) {
         item.explicits.push(createItemMod(line));
       }
     }
@@ -367,6 +367,40 @@ function isModLine(line: string): boolean {
     line.includes('to ') ||
     line.includes('with ')
   );
+}
+
+/**
+ * Stricter validation for mod lines - ensures the line has actual mod content
+ */
+function isValidModLine(line: string): boolean {
+  // First check basic mod line criteria
+  if (isPropertyLine(line)) return false;
+  if (isPobMetadata(line)) return false;
+
+  // Clean the line of PoB tags to check actual content
+  const cleanedLine = line
+    .replace(/^\{[^}]+\}/, '')
+    .replace(/\{[^}]*\}/g, '')
+    .replace(/<[^>]+>/g, '')
+    .trim();
+
+  // Reject empty or very short lines
+  if (!cleanedLine) return false;
+  if (cleanedLine.length < 5) return false;
+
+  // Reject lines that look like property values (e.g., "Armour: 450")
+  if (/^[A-Za-z\s]+:\s*[\d.]+$/.test(cleanedLine)) return false;
+
+  // Check for actual mod characteristics
+  const hasModCharacteristics =
+    /\d/.test(cleanedLine) ||
+    cleanedLine.startsWith('+') ||
+    cleanedLine.startsWith('-') ||
+    /increased|reduced|more|less|adds|gain|regenerate|leech|penetrate|chance|damage|resistance|life|mana|energy shield|armour|evasion|to attacks|to spells|per second|on hit|on kill|when hit/i.test(
+      cleanedLine
+    );
+
+  return hasModCharacteristics;
 }
 
 /**
